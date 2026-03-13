@@ -4,18 +4,26 @@ import axios from 'axios'
 import * as cheerio from 'cheerio'
 import OpenAI from 'openai'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
-
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 })
 
 export async function POST(request) {
   try {
-    const { youtubeUrl, userId } = await request.json()
+    const { youtubeUrl, userId, authToken } = await request.json()
+    
+    // Create Supabase client with user's auth token
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        global: {
+          headers: {
+            Authorization: `Bearer ${authToken}`
+          }
+        }
+      }
+    )
 
     if (!userId) {
       return NextResponse.json({ success: false, error: 'User ID required' })

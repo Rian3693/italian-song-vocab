@@ -75,12 +75,16 @@ export default function Home() {
     setLoading(true)
 
     try {
+      // Get the user's session token
+      const { data: { session } } = await supabase.auth.getSession()
+      
       const response = await fetch('/api/process-song', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           youtubeUrl,
-          userId: user.id 
+          userId: user.id,
+          authToken: session?.access_token
         })
       })
 
