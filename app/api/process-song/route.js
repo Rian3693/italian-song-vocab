@@ -15,7 +15,11 @@ const openai = new OpenAI({
 
 export async function POST(request) {
   try {
-    const { youtubeUrl } = await request.json()
+    const { youtubeUrl, userId } = await request.json()
+
+    if (!userId) {
+      return NextResponse.json({ success: false, error: 'User ID required' })
+    }
 
     // Extract video ID from YouTube URL
     const videoId = extractVideoId(youtubeUrl)
@@ -31,6 +35,7 @@ export async function POST(request) {
     const { data: song, error: songError } = await supabase
       .from('songs')
       .insert({
+        user_id: userId,
         title: songInfo.title,
         artist: songInfo.artist,
         youtube_url: youtubeUrl,

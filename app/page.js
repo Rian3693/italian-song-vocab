@@ -2,23 +2,54 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 
 export default function Home() {
+  const [user, setUser] = useState(null)
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [songs, setSongs] = useState([])
   const [selectedSong, setSelectedSong] = useState(null)
   const [vocabulary, setVocabulary] = useState([])
+  const [dailyUsage, setDailyUsage] = useState(0)
+  const router = useRouter()
 
-  // Load songs on mount
+  const DAILY_LIMIT = 3
+
   useEffect(() => {
-    loadSongs()
+    checkUser()
   }, [])
 
-  async function loadSongs() {
+  async function checkUser() {
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      router.push('/login')
+      return
+    }
+    
+    setUser(user)
+    loadSongs(user.id)
+    checkDailyUsage(user.id)
+  }
+
+  async function checkDailyUsage(userId) {
+    const today = new Date().toISOString().split('T')[0]
+    
+    const { count } = await supabase
+      .from('songs')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('created_at', `${today}T00:00:00`)
+    
+    setDailyUsage(count || 0)
+  }
+
+  async function loadSongs(userId) {
     const { data, error } = await supabase
       .from('songs')
       .select('*')
+      .eq('user_id', userId)
       .order('created_at', { ascending: false })
     
     if (data) setSongs(data)
@@ -35,13 +66,22 @@ export default function Home() {
 
   async function handleSubmit(e) {
     e.preventDefault()
+
+    if (dailyUsage >= DAILY_LIMIT) {
+      alert(`Daily limit reached! You can add ${DAILY_LIMIT} songs per day. Come back tomorrow! 🎵`)
+      return
+    }
+
     setLoading(true)
 
     try {
       const response = await fetch('/api/process-song', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ youtubeUrl })
+        body: JSON.stringify({ 
+          youtubeUrl,
+          userId: user.id 
+        })
       })
 
       const result = await response.json()
@@ -49,7 +89,8 @@ export default function Home() {
       if (result.success) {
         alert('Song processed successfully!')
         setYoutubeUrl('')
-        loadSongs()
+        loadSongs(user.id)
+        checkDailyUsage(user.id)
       } else {
         alert('Error: ' + result.error)
       }
@@ -65,12 +106,57 @@ export default function Home() {
     loadVocabulary(song.id)
   }
 
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
+  if (!user) {
+    return <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="text-xl">Loading...</div>
+    </div>
+  }
+
+  const remainingSongs = DAILY_LIMIT - dailyUsage
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-4xl font-bold text-indigo-900 mb-8">
-          🎵 Italian Song Vocabulary
-        </h1>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-4xl font-bold text-indigo-900">
+            🎵 Italian Song Vocabulary
+          </h1>
+          <button
+            onClick={handleLogout}
+            className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300"
+          >
+            Logout
+          </button>
+        </div>
+
+        {/* Daily Usage Indicator */}
+        <div className="bg-white rounded-lg shadow-lg p-4 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-gray-700">Today's Usage</h3>
+              <p className="text-sm text-gray-600">
+                {remainingSongs > 0 
+                  ? `${remainingSongs} song${remainingSongs !== 1 ? 's' : ''} remaining today` 
+                  : 'Daily limit reached! Come back tomorrow 🎵'}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {[...Array(DAILY_LIMIT)].map((_, i) => (
+                <div
+                  key={i}
+                  className={`w-3 h-3 rounded-full ${
+                    i < dailyUsage ? 'bg-indigo-600' : 'bg-gray-300'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
 
         {/* Add Song Form */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
@@ -83,10 +169,11 @@ export default function Home() {
               placeholder="Paste YouTube URL here..."
               className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               required
+              disabled={remainingSongs === 0}
             />
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || remainingSongs === 0}
               className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
             >
               {loading ? 'Processing...' : 'Add Song'}
