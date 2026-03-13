@@ -100,8 +100,14 @@ export default function Login() {
           {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
         </button>
 
-        <div className="mt-6 text-center text-sm text-gray-600">
+        <div className="mt-6 text-center text-sm text-gray-600 space-y-2">
           <p>✨ Free plan: 3 songs per day</p>
+          <p className="text-xs">
+            By signing up, you agree to our{' '}
+            <a href="/privacy" className="text-indigo-600 hover:text-indigo-800 underline">
+              Privacy Policy
+            </a>
+          </p>
         </div>
       </div>
     </div>

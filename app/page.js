@@ -161,23 +161,33 @@ export default function Home() {
         {/* Add Song Form */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
           <h2 className="text-2xl font-semibold mb-4">Add New Song</h2>
-          <form onSubmit={handleSubmit} className="flex gap-4">
-            <input
-              type="text"
-              value={youtubeUrl}
-              onChange={(e) => setYoutubeUrl(e.target.value)}
-              placeholder="Paste YouTube URL here..."
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              required
-              disabled={remainingSongs === 0}
-            />
-            <button
-              type="submit"
-              disabled={loading || remainingSongs === 0}
-              className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
-            >
-              {loading ? 'Processing...' : 'Add Song'}
-            </button>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="flex gap-4">
+              <input
+                type="text"
+                value={youtubeUrl}
+                onChange={(e) => setYoutubeUrl(e.target.value)}
+                placeholder="Paste YouTube URL here..."
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                required
+                disabled={remainingSongs === 0}
+              />
+              <button
+                type="submit"
+                disabled={loading || remainingSongs === 0}
+                className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
+              >
+                {loading ? 'Processing...' : 'Add Song'}
+              </button>
+            </div>
+            <div className="flex items-start gap-2 text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
+              <span className="text-blue-600 text-lg">ℹ️</span>
+              <p>
+                <strong>Why the limit?</strong> To keep this service free and available for everyone, 
+                we limit processing to 3 songs per day. This helps us manage AI and API costs 
+                while ensuring fair access for all learners. 🎵
+              </p>
+            </div>
           </form>
         </div>
 
@@ -247,6 +257,19 @@ export default function Home() {
               </p>
             )}
           </div>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-12 pt-6 border-t border-gray-300 text-center text-sm text-gray-600">
+          <p>
+            Made with ❤️ for Italian language learners • {' '}
+            <a href="/privacy" className="text-indigo-600 hover:text-indigo-800 underline">
+              Privacy Policy
+            </a>
+          </p>
+          <p className="mt-2 text-xs">
+            Your data is private and secure. We use AI to help you learn, not to track you.
+          </p>
         </div>
       </div>
     </div>
