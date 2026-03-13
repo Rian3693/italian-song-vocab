@@ -126,12 +126,26 @@ export default function Home() {
           <h1 className="text-4xl font-bold text-indigo-900">
             🎵 Italian Song Vocabulary
           </h1>
-          <button
-            onClick={handleLogout}
-            className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300"
-          >
-            Logout
-          </button>
+          <div className="flex gap-3">
+            <a
+              href="/stats"
+              className="bg-white text-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-50 font-semibold shadow-md"
+            >
+              📊 Stats
+            </a>
+            <a
+              href="/tips"
+              className="bg-white text-green-600 px-4 py-2 rounded-lg hover:bg-green-50 font-semibold shadow-md"
+            >
+              🎯 Tips
+            </a>
+            <button
+              onClick={handleLogout}
+              className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300"
+            >
+              Logout
+            </button>
+          </div>
         </div>
 
         {/* Daily Usage Indicator */}
