@@ -1,0 +1,61 @@
+╔════════════════════════════════════════════════════════════╗
+║    🎵 ITALIAN SONG VOCAB BUILDER - QUICK START CARD       ║
+╚════════════════════════════════════════════════════════════╝
+
+📦 INSTALL (one-time setup):
+   cd italian-song-vocab
+   npm install
+   
+🔑 ADD API KEYS:
+   1. Copy .env.local.example to .env.local
+   2. Add your OPENAI_API_KEY (get at platform.openai.com)
+   3. (Optional) Add GENIUS_API_KEY (get at genius.com/api-clients)
+
+🚀 RUN THE APP:
+   npm run dev
+   → Open http://localhost:3000
+
+📖 HOW TO USE:
+   1. Paste YouTube URL of Italian song
+   2. Click "Extract Vocabulary"
+   3. Wait ~20 seconds
+   4. Click "Start Learning"
+   5. Review flashcards!
+
+⌨️ KEYBOARD SHORTCUTS (during review):
+   Space    → Show answer
+   1        → Again
+   2        → Hard
+   3        → Good
+   4        → Easy
+
+💡 EXAMPLE SONGS TO TRY:
+   Laura Pausini - La Solitudine
+   Eros Ramazzotti - Più Bella Cosa
+   Tiziano Ferro - Perdono
+
+💰 COST:
+   ~$0.01 per song (OpenAI API)
+
+🐛 TROUBLESHOOTING:
+   "yt-dlp not found"    → Install yt-dlp (see README)
+   "API error"           → Check .env.local API key
+   "Lyrics not found"    → Try different video
+
+📁 PROJECT STRUCTURE:
+   pages/index.js        → Home page
+   pages/review.js       → Flashcard review
+   pages/api/            → Backend logic
+   lib/db.js             → Database
+   lib/sm2.js            → Spaced repetition
+
+🎯 PORTFOLIO HIGHLIGHTS:
+   ✓ Full-stack Next.js app
+   ✓ AI integration (GPT-4)
+   ✓ Database (SQLite)
+   ✓ API integration (YouTube, Genius)
+   ✓ Algorithm implementation (SM-2)
+   ✓ Real-world problem solving
+
+Need help? Check SETUP_GUIDE.md or README.md
+Built with ❤️ for Italian learners 🇮🇹
