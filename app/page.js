@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ensureApprovedOrRedirect } from '@/lib/access-client'
 import { saveUserPreferences } from '@/lib/preferences'
-import { t, learningLanguageNames, learningLanguageFullNames } from '@/lib/translations'
+import { t, learningLanguageNames, learningLanguageFullNames, nativeLanguageNames } from '@/lib/translations'
 import { useRouter } from 'next/navigation'
 
 export default function Home() {
@@ -176,6 +176,19 @@ export default function Home() {
     router.push('/login')
   }
 
+  async function switchNativeLanguage(newLang) {
+    if (!user || !prefs) return
+    try {
+      await saveUserPreferences(user.id, {
+        native_language: newLang,
+        learning_language: prefs.learning_language
+      })
+      setPrefs(prev => ({ ...prev, native_language: newLang }))
+    } catch (error) {
+      console.error('Failed to switch native language:', error)
+    }
+  }
+
   async function switchLearningLanguage(newLang) {
     if (!user || !prefs) return
     try {
@@ -208,6 +221,19 @@ export default function Home() {
             🎵 {t(lang, 'appTitle')}
           </h1>
           <div className="flex gap-3 items-center">
+            {/* Native language switcher */}
+            <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow-md">
+              <span className="text-sm font-semibold text-gray-600">{t(lang, 'nativeLangLabel')}</span>
+              <select
+                value={prefs?.native_language || 'en'}
+                onChange={(e) => switchNativeLanguage(e.target.value)}
+                className="bg-transparent text-green-700 font-semibold text-sm focus:outline-none cursor-pointer"
+              >
+                {Object.entries(nativeLanguageNames).map(([code, name]) => (
+                  <option key={code} value={code}>{name}</option>
+                ))}
+              </select>
+            </div>
             {/* Learning language switcher */}
             <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow-md">
               <span className="text-sm font-semibold text-gray-600">{t(lang, 'learningLangLabel')}</span>
