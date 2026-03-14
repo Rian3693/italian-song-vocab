@@ -111,14 +111,6 @@ function ReviewContent() {
     loadReviewCards(limit)
   }, [songId, reviewMode])
 
-  useEffect(() => {
-    if (!deck.length) return
-    if (showAnswer) return
-    if (!currentCard?.italian_word) return
-
-    const locale = currentCard.songs?.language === 'spanish' ? 'es-ES' : currentCard.songs?.language === 'english' ? 'en-US' : 'it-IT'
-    speakWord(currentCard.italian_word, locale)
-  }, [deck, showAnswer])
 
   useEffect(() => {
     if (!deck.length) return
@@ -567,9 +559,18 @@ function ReviewContent() {
             <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-5 text-center mb-6">
               <p className="text-indigo-600 font-bold uppercase tracking-wide text-sm mb-2">{t(lang, 'howToUse')}</p>
               {currentHint?.sentence && (
-                <p className="text-2xl text-slate-700 italic font-serif">
-                  "{renderClickableHintSentence(currentHint?.sentence)}"
-                </p>
+                <div className="flex items-center justify-center gap-2">
+                  <p className="text-2xl text-slate-700 italic font-serif">
+                    "{renderClickableHintSentence(currentHint?.sentence)}"
+                  </p>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); speakWord(currentHint.sentence, currentLocale) }}
+                    className="text-2xl hover:scale-110 transition-transform flex-shrink-0"
+                    title="Play sentence"
+                  >
+                    🔊
+                  </button>
+                </div>
               )}
               {currentHint?.translation && (
                 <p className="text-indigo-600 text-2xl italic font-semibold mt-3">{currentHint?.translation}</p>
@@ -592,19 +593,19 @@ function ReviewContent() {
         {showAnswer && (
           <div className="grid grid-cols-4 gap-4">
             <button onClick={() => handleRating(0)} disabled={savingReview} className="bg-red-500 text-white font-semibold py-3 rounded-xl hover:bg-red-600 transition leading-tight">
-              <div>{t(lang, 'again')} (1)</div>
+              <div>{t(lang, 'again')}</div>
               <div className="text-xs opacity-90 mt-1">&lt;1m</div>
             </button>
             <button onClick={() => handleRating(3)} disabled={savingReview} className="bg-orange-500 text-white font-semibold py-3 rounded-xl hover:bg-orange-600 transition leading-tight">
-              <div>{t(lang, 'hard')} (2)</div>
+              <div>{t(lang, 'hard')}</div>
               <div className="text-xs opacity-90 mt-1">&lt;10m</div>
             </button>
             <button onClick={() => handleRating(4)} disabled={savingReview} className="bg-green-500 text-white font-semibold py-3 rounded-xl hover:bg-green-600 transition leading-tight">
-              <div>{t(lang, 'good')} (3)</div>
+              <div>{t(lang, 'good')}</div>
               <div className="text-xs opacity-90 mt-1">1d</div>
             </button>
             <button onClick={() => handleRating(5)} disabled={savingReview} className="bg-blue-500 text-white font-semibold py-3 rounded-xl hover:bg-blue-600 transition leading-tight">
-              <div>{t(lang, 'easy')} (4)</div>
+              <div>{t(lang, 'easy')}</div>
               <div className="text-xs opacity-90 mt-1">4d</div>
             </button>
           </div>

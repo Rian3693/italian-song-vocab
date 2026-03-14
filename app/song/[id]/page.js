@@ -11,7 +11,6 @@ export default function SongPage({ params }) {
   const [song, setSong] = useState(null)
   const [vocabulary, setVocabulary] = useState([])
   const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
   const [prefs, setPrefs] = useState(null)
   const router = useRouter()
   const lang = prefs?.native_language || 'en'
@@ -50,36 +49,6 @@ export default function SongPage({ params }) {
     setLoading(false)
   }
 
-  async function handleRefresh() {
-    if (refreshing) return
-    setRefreshing(true)
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const response = await fetch('/api/reprocess-song', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          songId: params.id,
-          userId: session.user.id,
-          authToken: session.access_token,
-          nativeLanguage: prefs?.native_language || 'en'
-        })
-      })
-
-      const result = await response.json()
-      if (result.success) {
-        alert(t(lang, 'refreshSuccess')(result.vocabularyCount))
-        loadSongData()
-      } else {
-        alert(result.error || t(lang, 'refreshFailed'))
-      }
-    } catch (err) {
-      alert(t(lang, 'refreshFailed'))
-    } finally {
-      setRefreshing(false)
-    }
-  }
 
   if (loading) {
     return (
@@ -149,20 +118,11 @@ export default function SongPage({ params }) {
             </div>
           </div>
 
-          <div className="flex gap-3">
-            <Link href={`/review?song=${song.id}`} className="flex-1">
-              <button className="w-full bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 transition">
-                🎯 {t(lang, 'startLearningBtn')}
-              </button>
-            </Link>
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="bg-orange-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-orange-600 disabled:bg-gray-400 transition"
-            >
-              {refreshing ? t(lang, 'refreshing') : `🔄 ${t(lang, 'refreshSong')}`}
+          <Link href={`/review?song=${song.id}`}>
+            <button className="w-full bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 transition">
+              🎯 {t(lang, 'startLearningBtn')}
             </button>
-          </div>
+          </Link>
         </div>
 
         {/* Bilingual Lyrics */}

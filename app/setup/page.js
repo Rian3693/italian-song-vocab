@@ -90,7 +90,7 @@ export default function SetupPage() {
                   }`}
                 >
                   <div className="text-2xl mb-1">
-                    {code === 'en' ? '🇬🇧' : code === 'he' ? '🇮🇱' : '🇧🇷'}
+                    {code === 'en' ? '🇺🇸' : code === 'he' ? '🇮🇱' : '🇧🇷'}
                   </div>
                   <div className="text-sm">{name}</div>
                 </button>
@@ -115,7 +115,7 @@ export default function SetupPage() {
                   }`}
                 >
                   <div className="text-2xl mb-1">
-                    {code === 'italian' ? '🇮🇹' : code === 'spanish' ? '🇪🇸' : '🇬🇧'}
+                    {code === 'italian' ? '🇮🇹' : code === 'spanish' ? '🇪🇸' : '🇺🇸'}
                   </div>
                   <div className="text-sm">{name}</div>
                 </button>
