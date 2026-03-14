@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { getClients, requireAuthedUser, requireApproved } from '../access/_utils'
-import { fetchLyrics } from '@/lib/youtube'
+import { fetchLyrics } from '@/lib/lyrics'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -55,7 +55,7 @@ export async function POST(request) {
     // Fetch real lyrics
     let lyricsText = ''
     try {
-      const lyrics = await fetchLyrics(song.artist, song.title, { youtubeUrl, language })
+      const lyrics = await fetchLyrics(song.artist, song.title)
       if (lyrics && lyrics.trim().length > 50) {
         lyricsText = lyrics.trim()
       }

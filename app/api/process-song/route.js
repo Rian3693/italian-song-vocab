@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import axios from 'axios'
 import OpenAI from 'openai'
 import { getClients, requireAuthedUser, requireApproved } from '../access/_utils'
-import { fetchLyrics } from '@/lib/youtube'
+import { fetchLyrics } from '@/lib/lyrics'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -78,7 +78,7 @@ export async function POST(request) {
     const songInfo = await getSongInfo(videoId)
     
     // Get lyrics
-    const lyricsText = await getLyrics(songInfo.title, songInfo.artist, youtubeUrl, language)
+    const lyricsText = await getLyrics(songInfo.title, songInfo.artist)
     
     // Generate summary using AI
     const summary = await generateSummary(songInfo.title, songInfo.artist, lyricsText, language, nativeLanguage)
@@ -203,9 +203,9 @@ async function getSongInfo(videoId) {
   }
 }
 
-async function getLyrics(title, artist, youtubeUrl, language) {
+async function getLyrics(title, artist) {
   try {
-    const lyrics = await fetchLyrics(artist, title, { youtubeUrl, language })
+    const lyrics = await fetchLyrics(artist, title)
     if (lyrics && lyrics.trim().length > 50) {
       return lyrics.trim()
     }
