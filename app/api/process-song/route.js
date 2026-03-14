@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import axios from 'axios'
-import * as cheerio from 'cheerio'
 import OpenAI from 'openai'
 
 const openai = new OpenAI({
@@ -10,9 +9,8 @@ const openai = new OpenAI({
 
 export async function POST(request) {
   try {
-    const { youtubeUrl, userId, authToken } = await request.json()
+    const { youtubeUrl, userId, authToken, language = 'italian' } = await request.json()
     
-    // Create Supabase client with user's auth token
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -29,15 +27,25 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'User ID required' })
     }
 
-    // Extract video ID from YouTube URL
     const videoId = extractVideoId(youtubeUrl)
     if (!videoId) {
       return NextResponse.json({ success: false, error: 'Invalid YouTube URL' })
     }
 
-    // Get song info and lyrics
+    // Get song info
     const songInfo = await getSongInfo(videoId)
-    const lyrics = await getLyrics(songInfo.title, songInfo.artist)
+    
+    // Get lyrics
+    const lyricsText = await getLyrics(songInfo.title, songInfo.artist)
+    
+    // Generate summary using AI
+    const summary = await generateSummary(songInfo.title, songInfo.artist, lyricsText, language)
+    
+    // Generate bilingual lyrics with translations
+    const bilingualLyrics = await generateBilingualLyrics(lyricsText, language)
+    
+    // Extract vocabulary using AI
+    const vocabulary = await extractVocabulary(lyricsText, songInfo.title, language)
 
     // Save song to database
     const { data: song, error: songError } = await supabase
@@ -47,15 +55,14 @@ export async function POST(request) {
         title: songInfo.title,
         artist: songInfo.artist,
         youtube_url: youtubeUrl,
-        lyrics: lyrics
+        lyrics: JSON.stringify(bilingualLyrics),
+        summary: summary,
+        language: language
       })
       .select()
       .single()
 
     if (songError) throw songError
-
-    // Extract vocabulary using OpenAI
-    const vocabulary = await extractVocabulary(lyrics, songInfo.title)
 
     // Save vocabulary to database
     const vocabularyRecords = vocabulary.map(word => ({
@@ -71,7 +78,12 @@ export async function POST(request) {
 
     if (vocabError) throw vocabError
 
-    return NextResponse.json({ success: true, song })
+    return NextResponse.json({ 
+      success: true, 
+      song,
+      vocabularyCount: vocabulary.length,
+      songId: song.id
+    })
   } catch (error) {
     console.error('Error processing song:', error)
     return NextResponse.json({ 
@@ -96,14 +108,11 @@ function extractVideoId(url) {
 
 async function getSongInfo(videoId) {
   try {
-    // Use YouTube oEmbed API to get video title
     const response = await axios.get(
       `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
     )
     
     const fullTitle = response.data.title
-    
-    // Try to split into artist and title
     let artist = 'Unknown Artist'
     let title = fullTitle
     
@@ -119,41 +128,100 @@ async function getSongInfo(videoId) {
     
     return { title, artist }
   } catch (error) {
-    console.error('Error getting song info:', error)
     return { title: 'Unknown Song', artist: 'Unknown Artist' }
   }
 }
 
 async function getLyrics(title, artist) {
+  // Placeholder - you can integrate Genius API or Musixmatch here
+  return `[Verse 1]\n(Lyrics placeholder - integrate lyrics API or paste manually)\n\n[Chorus]\n...`
+}
+
+async function generateSummary(title, artist, lyrics, language) {
   try {
-    // Try Genius lyrics
-    const searchQuery = encodeURIComponent(`${artist} ${title} lyrics`)
-    const searchUrl = `https://www.google.com/search?q=${searchQuery}`
+    const languageLabel = language === 'spanish' ? 'Spanish' : 'Italian'
     
-    const response = await axios.get(searchUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
+    const prompt = `You are a music expert. Write a brief, engaging 2-3 sentence summary of this ${languageLabel} song:
+
+Title: "${title}" by ${artist}
+
+Lyrics excerpt:
+${lyrics.substring(0, 500)}...
+
+Write a summary that describes the song's theme, mood, and what it's about. Be concise and interesting.`
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+      max_tokens: 150
     })
-    
-    const $ = cheerio.load(response.data)
-    
-    // This is a simplified version - you might need to adjust based on actual HTML structure
-    // For a production app, consider using a proper lyrics API like Genius API or Musixmatch
-    
-    return "Lyrics extraction placeholder - please paste lyrics manually or integrate a lyrics API"
+
+    return response.choices[0].message.content.trim()
   } catch (error) {
-    console.error('Error fetching lyrics:', error)
-    return "Could not fetch lyrics automatically"
+    console.error('Error generating summary:', error)
+    return `A beautiful ${language === 'spanish' ? 'Spanish' : 'Italian'} song by ${artist}.`
   }
 }
 
-async function extractVocabulary(lyrics, songTitle) {
+async function generateBilingualLyrics(lyrics, language) {
   try {
-    const prompt = `You are an Italian language teacher. Analyze these Italian song lyrics and extract the 15-20 most useful vocabulary words for language learners.
+    const languageLabel = language === 'spanish' ? 'Spanish' : 'Italian'
+    const languageCode = language === 'spanish' ? 'es' : 'it'
+    
+    const prompt = `Translate these ${languageLabel} lyrics to English line by line. Return ONLY a JSON array where each object has:
+- "${languageCode}": the original ${languageLabel} line
+- "en": the English translation
+
+Format:
+[
+  {"${languageCode}": "original line", "en": "translation"},
+  {"${languageCode}": "", "en": ""} // for blank lines
+]
+
+Lyrics:
+${lyrics}
+
+Return ONLY the JSON array, no other text.`
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.3,
+      max_tokens: 3000
+    })
+
+    const content = response.choices[0].message.content
+    const jsonMatch = content.match(/\[[\s\S]*\]/)
+    
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0])
+    }
+    
+    // Fallback: simple structure
+    return lyrics.split('\n').map(line => ({
+      [languageCode]: line,
+      en: ''
+    }))
+  } catch (error) {
+    console.error('Error generating bilingual lyrics:', error)
+    const languageCode = language === 'spanish' ? 'es' : 'it'
+    return lyrics.split('\n').map(line => ({
+      [languageCode]: line,
+      en: ''
+    }))
+  }
+}
+
+async function extractVocabulary(lyrics, songTitle, language) {
+  try {
+    const languageLabel = language === 'spanish' ? 'Spanish' : 'Italian'
+    const languageCode = language === 'spanish' ? 'Spanish' : 'Italian'
+    
+    const prompt = `You are a ${languageLabel} language teacher. Analyze these ${languageLabel} song lyrics and extract the 15-20 most useful vocabulary words for language learners.
 
 For each word, provide:
-1. The Italian word
+1. The ${languageLabel} word
 2. English translation
 3. The context/phrase from the lyrics where it appears
 

@@ -1,0 +1,179 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+
+export default function SongPage({ params }) {
+  const [song, setSong] = useState(null)
+  const [vocabulary, setVocabulary] = useState([])
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+
+  useEffect(() => {
+    loadSongData()
+  }, [params.id])
+
+  async function loadSongData() {
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      router.push('/login')
+      return
+    }
+
+    // Load song
+    const { data: songData } = await supabase
+      .from('songs')
+      .select('*')
+      .eq('id', params.id)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!songData) {
+      router.push('/')
+      return
+    }
+
+    setSong(songData)
+
+    // Load vocabulary
+    const { data: vocabData } = await supabase
+      .from('vocabulary')
+      .select('*')
+      .eq('song_id', params.id)
+
+    setVocabulary(vocabData || [])
+    setLoading(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-xl">Loading song...</div>
+      </div>
+    )
+  }
+
+  if (!song) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
+        <div className="max-w-4xl mx-auto text-center">
+          <h1 className="text-3xl font-bold text-gray-800 mb-4">Song not found</h1>
+          <Link href="/">
+            <button className="bg-indigo-600 text-white px-6 py-3 rounded-lg">Go Home</button>
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  const languageLabel = song.language === 'spanish' ? 'Spanish' : 'Italian'
+  const languageCode = song.language === 'spanish' ? 'es' : 'it'
+
+  let parsedLyrics = []
+  try {
+    parsedLyrics = JSON.parse(song.lyrics || '[]')
+  } catch (e) {
+    parsedLyrics = []
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
+      <div className="max-w-4xl mx-auto">
+        <Link href="/">
+          <button className="mb-6 text-indigo-600 hover:text-indigo-800 font-semibold">
+            ← Back to Home
+          </button>
+        </Link>
+
+        {/* Song Header */}
+        <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
+          <h1 className="text-4xl font-bold text-gray-800 mb-2">{song.title}</h1>
+          {song.artist && <p className="text-xl text-gray-600 mb-6">by {song.artist}</p>}
+          <span className="inline-block mb-6 text-xs uppercase bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full font-bold tracking-wide">
+            {languageLabel}
+          </span>
+
+          {/* Summary */}
+          {song.summary && (
+            <div className="bg-indigo-50 p-6 rounded-lg mb-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-2">📖 Summary:</h2>
+              <p className="text-gray-700">{song.summary}</p>
+            </div>
+          )}
+
+          {/* Stats */}
+          <div className="flex gap-4 mb-6">
+            <div className="flex-1 bg-green-50 p-4 rounded-lg text-center">
+              <p className="text-3xl font-bold text-green-600">{vocabulary.length}</p>
+              <p className="text-sm text-gray-600">{languageLabel} Words</p>
+            </div>
+            <div className="flex-1 bg-blue-50 p-4 rounded-lg text-center">
+              <p className="text-3xl font-bold text-blue-600">
+                {new Date(song.created_at).toLocaleDateString()}
+              </p>
+              <p className="text-sm text-gray-600">Added</p>
+            </div>
+          </div>
+
+          {/* Start Learning Button */}
+          <Link href={`/review?song=${song.id}`}>
+            <button className="w-full bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 transition">
+              🎯 Start Learning
+            </button>
+          </Link>
+        </div>
+
+        {/* Bilingual Lyrics */}
+        {parsedLyrics.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">🎤 {languageLabel} Lyrics & Translation</h2>
+            <div className="space-y-6 font-serif">
+              {parsedLyrics.map((line, i) => {
+                const originalText = line[languageCode] || line.it || ''
+                const englishText = line.en || ''
+
+                if (originalText.trim() === '') {
+                  return <div key={i} className="h-4" />
+                }
+
+                if (originalText.trim().startsWith('[') && originalText.trim().endsWith(']')) {
+                  return (
+                    <p key={i} className="text-gray-400 font-bold mt-6 mb-2 text-sm uppercase tracking-wider">
+                      {originalText}
+                    </p>
+                  )
+                }
+
+                return (
+                  <div key={i} className="pl-0 py-0.5">
+                    <p className="text-xl text-gray-800 font-medium leading-tight">{originalText}</p>
+                    {englishText && <p className="text-sm text-gray-400 italic mt-0.5">{englishText}</p>}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Vocabulary List */}
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          <h2 className="text-2xl font-bold text-gray-800 mb-6">📚 {languageLabel} Vocabulary</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {vocabulary.map((card) => (
+              <div key={card.id} className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                <p className="text-xl font-bold text-gray-800">{card.italian_word}</p>
+                <p className="text-gray-600">{card.english_translation}</p>
+                {card.context && (
+                  <p className="text-sm text-gray-500 italic mt-2">"{card.context}"</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

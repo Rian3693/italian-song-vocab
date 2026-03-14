@@ -91,10 +91,15 @@ export default function Home() {
       const result = await response.json()
       
       if (result.success) {
-        alert('Song processed successfully!')
+        alert(`✅ Success! Created ${result.vocabularyCount} Italian flashcards from "${result.song.title}"`)
         setYoutubeUrl('')
         loadSongs(user.id)
         checkDailyUsage(user.id)
+        
+        // Redirect to song page after 1.5 seconds
+        setTimeout(() => {
+          window.location.href = `/song/${result.songId}`
+        }, 1500)
       } else {
         alert('Error: ' + result.error)
       }
@@ -108,6 +113,10 @@ export default function Home() {
   function selectSong(song) {
     setSelectedSong(song)
     loadVocabulary(song.id)
+  }
+
+  function navigateToSong(song) {
+    window.location.href = `/song/${song.id}`
   }
 
   async function handleLogout() {
@@ -132,6 +141,18 @@ export default function Home() {
           </h1>
           <div className="flex gap-3">
             <a
+              href="/review"
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-semibold shadow-md"
+            >
+              🎯 Review
+            </a>
+            <a
+              href="/all-cards"
+              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-semibold shadow-md"
+            >
+              📚 All Cards
+            </a>
+            <a
               href="/stats"
               className="bg-white text-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-50 font-semibold shadow-md"
             >
@@ -139,9 +160,9 @@ export default function Home() {
             </a>
             <a
               href="/tips"
-              className="bg-white text-green-600 px-4 py-2 rounded-lg hover:bg-green-50 font-semibold shadow-md"
+              className="bg-white text-orange-600 px-4 py-2 rounded-lg hover:bg-orange-50 font-semibold shadow-md"
             >
-              🎯 Tips
+              💡 Tips
             </a>
             <button
               onClick={handleLogout}
@@ -217,15 +238,22 @@ export default function Home() {
               {songs.map((song) => (
                 <div
                   key={song.id}
-                  onClick={() => selectSong(song)}
-                  className={`p-4 rounded-lg cursor-pointer transition ${
+                  className={`p-4 rounded-lg transition ${
                     selectedSong?.id === song.id
                       ? 'bg-indigo-100 border-2 border-indigo-500'
                       : 'bg-gray-50 hover:bg-gray-100'
                   }`}
                 >
-                  <h3 className="font-semibold text-lg">{song.title}</h3>
-                  <p className="text-gray-600">{song.artist}</p>
+                  <div onClick={() => selectSong(song)} className="cursor-pointer">
+                    <h3 className="font-semibold text-lg">{song.title}</h3>
+                    <p className="text-gray-600 text-sm">{song.artist}</p>
+                  </div>
+                  <button
+                    onClick={() => navigateToSong(song)}
+                    className="mt-2 text-xs text-indigo-600 hover:text-indigo-800 font-semibold"
+                  >
+                    View Details →
+                  </button>
                 </div>
               ))}
               {songs.length === 0 && (
