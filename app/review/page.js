@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ensureApprovedOrRedirect } from '@/lib/access-client'
-import { t } from '@/lib/translations'
+import { t, learningLanguageFullNames } from '@/lib/translations'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
@@ -540,9 +540,14 @@ function ReviewContent() {
           className="bg-white rounded-3xl shadow-2xl p-6 sm:p-10 mb-8 min-h-[520px] flex flex-col justify-between cursor-pointer"
         >
           <div>
-            <p className="text-slate-500 font-medium mb-6">{t(lang, 'fromSong')} {currentCard.songs?.title || 'Song'}</p>
+            <div className="flex items-center justify-between mb-6">
+              <p className="text-slate-500 font-medium">{t(lang, 'fromSong')} {currentCard.songs?.title || 'Song'}</p>
+              <span className="text-xs uppercase bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full font-bold tracking-wide">
+                {learningLanguageFullNames[currentCard.songs?.language] || 'Italian'}
+              </span>
+            </div>
 
-            <div className="text-center mb-5">
+            <div className="text-center mb-5" dir="ltr">
               <div className="flex items-center justify-center gap-3 mb-3">
                 <h2 className="text-5xl sm:text-6xl font-bold text-slate-900">{currentCard.italian_word}</h2>
                 <button
@@ -558,7 +563,7 @@ function ReviewContent() {
                 <div className="text-slate-500 italic text-lg">
                   <p>{t(lang, 'fromLyrics')} "{currentCard.context}"</p>
                   {currentHint?.contextTranslation && (
-                    <p className="text-slate-400 text-sm not-italic mt-1">{currentHint?.contextTranslation}</p>
+                    <p className="text-slate-400 text-sm not-italic mt-1" dir="auto">{currentHint?.contextTranslation}</p>
                   )}
                 </div>
               )}
@@ -567,7 +572,7 @@ function ReviewContent() {
             <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-5 text-center mb-6">
               <p className="text-indigo-600 font-bold uppercase tracking-wide text-sm mb-2">{t(lang, 'howToUse')}</p>
               {currentHint?.sentence && (
-                <div className="flex items-center justify-center gap-2">
+                <div className="flex items-center justify-center gap-2" dir="ltr">
                   <p className="text-2xl text-slate-700 italic font-serif">
                     "{renderClickableHintSentence(currentHint?.sentence)}"
                   </p>
@@ -581,7 +586,7 @@ function ReviewContent() {
                 </div>
               )}
               {currentHint?.translation && (
-                <p className="text-indigo-600 text-2xl italic font-semibold mt-3">{currentHint?.translation}</p>
+                <p className="text-indigo-600 text-2xl italic font-semibold mt-3" dir="auto">{currentHint?.translation}</p>
               )}
               <p className="text-xs text-slate-500 mt-3 not-italic">{t(lang, 'clickWordHint')}</p>
             </div>
