@@ -8,53 +8,13 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 })
 
+const AI_MODEL = 'gpt-4o-mini'
+
 function normalizeWord(value) {
   return String(value || '')
     .trim()
     .replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '')
     .toLowerCase()
-}
-
-async function cleanupDuplicateVocabularyForUser(userClient, adminClient) {
-  if (!adminClient) return 0
-
-  const { data: rows, error } = await userClient
-    .from('vocabulary')
-    .select('id, italian_word, created_at, songs!inner(user_id)')
-
-  if (error || !rows?.length) return 0
-
-  const groups = new Map()
-  for (const row of rows) {
-    const key = normalizeWord(row.italian_word)
-    if (!key) continue
-    if (!groups.has(key)) groups.set(key, [])
-    groups.get(key).push(row)
-  }
-
-  const duplicateIds = []
-  for (const groupRows of groups.values()) {
-    if (groupRows.length <= 1) continue
-
-    groupRows.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-    for (let i = 1; i < groupRows.length; i += 1) {
-      duplicateIds.push(groupRows[i].id)
-    }
-  }
-
-  if (!duplicateIds.length) return 0
-
-  const { error: deleteError } = await adminClient
-    .from('vocabulary')
-    .delete()
-    .in('id', duplicateIds)
-
-  if (deleteError) {
-    console.error('Duplicate cleanup failed:', deleteError)
-    return 0
-  }
-
-  return duplicateIds.length
 }
 
 export async function POST(request) {
@@ -76,18 +36,20 @@ export async function POST(request) {
 
     // Get song info
     const songInfo = await getSongInfo(videoId)
-    
+
     // Get lyrics
     const lyricsText = await getLyrics(songInfo.title, songInfo.artist)
-    
-    // Generate summary using AI
-    const summary = await generateSummary(songInfo.title, songInfo.artist, lyricsText, language, nativeLanguage)
 
-    // Generate bilingual lyrics with translations
-    const bilingualLyrics = await generateBilingualLyrics(lyricsText, language, nativeLanguage)
+    const languageLabel = getLearningLangName(language)
+    const languageCode = getLearningLangCode(language)
+    const nativeLangName = getNativeLangName(nativeLanguage)
 
-    // Extract vocabulary using AI
-    const vocabulary = await extractVocabulary(lyricsText, songInfo.title, language, nativeLanguage)
+    // Run all 3 AI calls IN PARALLEL to stay within Vercel timeout
+    const [summary, bilingualLyrics, vocabulary] = await Promise.all([
+      generateSummary(songInfo.title, songInfo.artist, lyricsText, languageLabel, nativeLangName),
+      generateBilingualLyrics(lyricsText, languageLabel, languageCode, nativeLangName),
+      extractVocabulary(lyricsText, languageLabel, nativeLangName)
+    ])
 
     // Save song to database
     const { data: song, error: songError } = await userClient
@@ -145,21 +107,17 @@ export async function POST(request) {
       if (vocabError) throw vocabError
     }
 
-    // Remove any pre-existing duplicates for this user (keep oldest copy).
-    const removedDuplicates = await cleanupDuplicateVocabularyForUser(userClient, adminClient)
-
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       song,
       vocabularyCount: vocabularyRecords.length,
-      removedDuplicates,
       songId: song.id
     })
   } catch (error) {
     console.error('Error processing song:', error)
-    return NextResponse.json({ 
-      success: false, 
-      error: error.message 
+    return NextResponse.json({
+      success: false,
+      error: error.message
     })
   }
 }
@@ -169,7 +127,7 @@ function extractVideoId(url) {
     /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/,
     /youtube\.com\/embed\/([^&\n?#]+)/
   ]
-  
+
   for (const pattern of patterns) {
     const match = url.match(pattern)
     if (match) return match[1]
@@ -180,13 +138,14 @@ function extractVideoId(url) {
 async function getSongInfo(videoId) {
   try {
     const response = await axios.get(
-      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
+      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+      { timeout: 5000 }
     )
-    
+
     const fullTitle = response.data.title
     let artist = 'Unknown Artist'
     let title = fullTitle
-    
+
     if (fullTitle.includes('-')) {
       const parts = fullTitle.split('-')
       artist = parts[0].trim()
@@ -196,7 +155,7 @@ async function getSongInfo(videoId) {
       artist = parts[0].trim()
       title = parts[1].trim()
     }
-    
+
     return { title, artist }
   } catch (error) {
     return { title: 'Unknown Song', artist: 'Unknown Artist' }
@@ -216,7 +175,7 @@ async function getLyrics(title, artist) {
   // Last resort: ask AI to generate approximate lyrics from memory
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: AI_MODEL,
       messages: [{
         role: 'user',
         content: `Write the full lyrics of the song "${title}" by ${artist}. Write ONLY the lyrics, nothing else. If you don't know the exact lyrics, write as close as you can remember.`
@@ -230,148 +189,67 @@ async function getLyrics(title, artist) {
     console.error('AI lyrics fallback failed:', err.message)
   }
 
-  throw new Error('Could not find lyrics for this song. Try pasting the lyrics manually.')
+  throw new Error('Could not find lyrics for this song.')
 }
 
 const NATIVE_LANG_NAMES = { en: 'English', he: 'Hebrew', pt: 'Portuguese' }
 const LEARNING_LANG_NAMES = { italian: 'Italian', spanish: 'Spanish', english: 'English' }
 
-function getNativeLangName(code) {
-  return NATIVE_LANG_NAMES[code] || 'English'
-}
-
-function getLearningLangName(code) {
-  return LEARNING_LANG_NAMES[code] || 'Italian'
-}
-
-async function generateSummary(title, artist, lyrics, language, nativeLanguage = 'en') {
-  try {
-    const languageLabel = getLearningLangName(language)
-    const nativeLangName = getNativeLangName(nativeLanguage)
-
-    const prompt = `You are a music expert. Write a brief, engaging 2-3 sentence summary of this ${languageLabel} song in ${nativeLangName}:
-
-Title: "${title}" by ${artist}
-
-Lyrics excerpt:
-${lyrics.substring(0, 500)}...
-
-Write the summary in ${nativeLangName}. Describe the song's theme, mood, and what it's about. Be concise and interesting.`
-
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-      max_tokens: 400
-    })
-
-    return response.choices[0].message.content.trim()
-  } catch (error) {
-    console.error('Error generating summary:', error)
-    return `A beautiful ${getLearningLangName(language)} song by ${artist}.`
-  }
-}
-
+function getNativeLangName(code) { return NATIVE_LANG_NAMES[code] || 'English' }
+function getLearningLangName(code) { return LEARNING_LANG_NAMES[code] || 'Italian' }
 function getLearningLangCode(language) {
   if (language === 'spanish') return 'es'
   if (language === 'english') return 'en'
   return 'it'
 }
 
-async function generateBilingualLyrics(lyrics, language, nativeLanguage = 'en') {
+async function generateSummary(title, artist, lyrics, languageLabel, nativeLangName) {
   try {
-    const languageLabel = getLearningLangName(language)
-    const languageCode = getLearningLangCode(language)
-    const nativeLangName = getNativeLangName(nativeLanguage)
-
-    const prompt = `Translate these ${languageLabel} lyrics to ${nativeLangName} line by line. Return ONLY a JSON array where each object has:
-- "${languageCode}": the original ${languageLabel} line
-- "translation": the ${nativeLangName} translation
-
-Format:
-[
-  {"${languageCode}": "original line", "translation": "translated line"},
-  {"${languageCode}": "", "translation": ""} // for blank lines
-]
-
-Lyrics:
-${lyrics}
-
-Return ONLY the JSON array, no other text.`
-
     const response = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [{ role: 'user', content: prompt }],
+      model: AI_MODEL,
+      messages: [{ role: 'user', content: `You are a music expert. Write a brief, engaging 2-3 sentence summary of this ${languageLabel} song in ${nativeLangName}:\n\nTitle: "${title}" by ${artist}\n\nLyrics excerpt:\n${lyrics.substring(0, 500)}...\n\nWrite the summary in ${nativeLangName}. Describe the song's theme, mood, and what it's about.` }],
+      temperature: 0.7,
+      max_tokens: 400
+    })
+    return response.choices[0].message.content.trim()
+  } catch (error) {
+    console.error('Error generating summary:', error)
+    return `A beautiful ${languageLabel} song by ${artist}.`
+  }
+}
+
+async function generateBilingualLyrics(lyrics, languageLabel, languageCode, nativeLangName) {
+  try {
+    const response = await openai.chat.completions.create({
+      model: AI_MODEL,
+      messages: [{ role: 'user', content: `Translate these ${languageLabel} lyrics to ${nativeLangName} line by line. Return ONLY a JSON array where each object has:\n- "${languageCode}": the original ${languageLabel} line\n- "translation": the ${nativeLangName} translation\n\nFormat:\n[\n  {"${languageCode}": "original line", "translation": "translated line"},\n  {"${languageCode}": "", "translation": ""}\n]\n\nLyrics:\n${lyrics}\n\nReturn ONLY the JSON array, no other text.` }],
       temperature: 0.3,
-      max_tokens: 3000
+      max_tokens: 4000
     })
 
     const content = response.choices[0].message.content
     const jsonMatch = content.match(/\[[\s\S]*\]/)
+    if (jsonMatch) return JSON.parse(jsonMatch[0])
 
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0])
-    }
-
-    return lyrics.split('\n').map(line => ({
-      [languageCode]: line,
-      translation: ''
-    }))
+    return lyrics.split('\n').map(line => ({ [languageCode]: line, translation: '' }))
   } catch (error) {
     console.error('Error generating bilingual lyrics:', error)
-    const languageCode = getLearningLangCode(language)
-    return lyrics.split('\n').map(line => ({
-      [languageCode]: line,
-      translation: ''
-    }))
+    return lyrics.split('\n').map(line => ({ [languageCode]: line, translation: '' }))
   }
 }
 
-async function extractVocabulary(lyrics, songTitle, language, nativeLanguage = 'en') {
+async function extractVocabulary(lyrics, languageLabel, nativeLangName) {
   try {
-    const languageLabel = getLearningLangName(language)
-    const nativeLangName = getNativeLangName(nativeLanguage)
-
-    const prompt = `You are a ${languageLabel} language teacher. Analyze these ${languageLabel} song lyrics and extract 30-50 vocabulary words for language learners. Extract as many useful words as possible.
-
-For each word, provide:
-1. The ${languageLabel} word (use key "word")
-2. ${nativeLangName} translation (use key "translation")
-3. The context/phrase from the lyrics where it appears (use key "context")
-
-Return ONLY a JSON array in this exact format:
-[
-  {
-    "word": "${languageLabel} word here",
-    "translation": "${nativeLangName} translation here",
-    "context": "phrase from lyrics"
-  }
-]
-
-Lyrics:
-${lyrics}
-
-Focus on:
-- All verbs, nouns, adjectives, and adverbs
-- Useful everyday expressions
-- Words that are not too basic (skip articles like "il", "la", "el", basic pronouns like "io", "tu", "yo")
-- Include any interesting idioms or expressions
-- Include conjugated verb forms with their infinitive as the word`
-
     const response = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [{ role: 'user', content: prompt }],
+      model: AI_MODEL,
+      messages: [{ role: 'user', content: `You are a ${languageLabel} language teacher. Analyze these ${languageLabel} song lyrics and extract 30-50 vocabulary words for language learners.\n\nFor each word, provide:\n1. The ${languageLabel} word (key: "word")\n2. ${nativeLangName} translation (key: "translation")\n3. Context phrase from lyrics (key: "context")\n\nReturn ONLY a JSON array:\n[\n  {"word": "...", "translation": "...", "context": "..."}\n]\n\nLyrics:\n${lyrics}\n\nFocus on verbs, nouns, adjectives, adverbs, expressions. Skip basic articles and pronouns.` }],
       temperature: 0.7,
       max_tokens: 4000
     })
 
     const content = response.choices[0].message.content
     const jsonMatch = content.match(/\[[\s\S]*\]/)
-
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0])
-    }
-
+    if (jsonMatch) return JSON.parse(jsonMatch[0])
     return []
   } catch (error) {
     console.error('Error extracting vocabulary:', error)

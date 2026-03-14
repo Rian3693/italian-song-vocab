@@ -124,6 +124,10 @@ export default function Home() {
         })
       })
 
+      if (!response.ok && response.headers.get('content-type')?.includes('text/html')) {
+        throw new Error('Server error — the request timed out. Please try again.')
+      }
+
       const result = await response.json()
 
       if (result.success) {
