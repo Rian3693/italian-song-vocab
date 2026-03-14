@@ -111,6 +111,14 @@ function ReviewContent() {
     loadReviewCards(limit)
   }, [songId, reviewMode])
 
+  useEffect(() => {
+    if (!deck.length) return
+    if (showAnswer) return
+    if (!currentCard?.italian_word) return
+
+    const locale = currentCard.songs?.language === 'spanish' ? 'es-ES' : currentCard.songs?.language === 'english' ? 'en-US' : 'it-IT'
+    speakWord(currentCard.italian_word, locale)
+  }, [deck, showAnswer])
 
   useEffect(() => {
     if (!deck.length) return
